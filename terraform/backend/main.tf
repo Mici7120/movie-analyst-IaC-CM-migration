@@ -1,35 +1,33 @@
+# --- RDS MySQL ---
 resource "aws_db_subnet_group" "db_subnet_group" {
+  name_prefix = "${var.environment}-mysql-subnets-"
   subnet_ids  = var.vpc_private_subnets
 
   tags = {
+    Name        = "${var.environment}-mysql-subnet-group"
     environment = var.environment
   }
 }
 
 resource "aws_security_group" "sg_rds" {
-  description = "security group for the mysql rds"
-  vpc_id  = var.vpc_id
+  name_prefix = "${var.environment}-rds-mysql-"
+  description = "Security group for the RDS MySQL database"
+  vpc_id      = var.vpc_id
 
   tags = {
+    Name        = "${var.environment}-rds-mysql-sg"
     environment = var.environment
-    terraform = true
+    terraform   = "true"
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "rds_ingress_tcp_ipv4-us-east-1a" {
-  security_group_id = aws_security_group.sg_rds.id
-  cidr_ipv4         = var.private_subnets[0]
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
-}
-
-resource "aws_vpc_security_group_ingress_rule" "rds_ingress_tcp_ipv4-us-east-1b" {
-  security_group_id = aws_security_group.sg_rds.id
-  cidr_ipv4         = var.private_subnets[1]
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
+# Allow MySQL (3306) strictly from backend EC2 instances
+resource "aws_vpc_security_group_ingress_rule" "rds_ingress_mysql_from_backend" {
+  security_group_id            = aws_security_group.sg_rds.id
+  referenced_security_group_id = aws_security_group.sg_ec2.id
+  from_port                    = 3306
+  ip_protocol                  = "tcp"
+  to_port                      = 3306
 }
 
 resource "aws_vpc_security_group_egress_rule" "rds_egress_traffic_ipv4" {
@@ -39,99 +37,99 @@ resource "aws_vpc_security_group_egress_rule" "rds_egress_traffic_ipv4" {
 }
 
 resource "aws_db_instance" "mysql_db" {
-  allocated_storage    = 20
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro"
-  username             = var.mysql_username
-  password             = var.mysql_password
-  parameter_group_name = "default.mysql8.0"
-
-  db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
-  multi_az = false
-  publicly_accessible = false
+  identifier_prefix      = "${var.environment}-movie-analyst-"
+  allocated_storage      = 20
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = var.rds_instance_class
+  db_name                = var.rds_db_name
+  username               = var.mysql_username
+  password               = var.mysql_password
+  parameter_group_name   = "default.mysql8.0"
+  db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
+  multi_az               = var.rds_multi_az
+  publicly_accessible    = false
   vpc_security_group_ids = [aws_security_group.sg_rds.id]
-  skip_final_snapshot = true
+  skip_final_snapshot    = true
+  storage_encrypted      = true
 
   tags = {
+    Name        = "${var.environment}-movie-analyst-mysql"
     environment = var.environment
-    terraform = true
+    terraform   = "true"
   }
 }
 
-# --- nlb security_groups ---
+# --- Internal NLB Security Group ---
 resource "aws_security_group" "sg_nlb" {
-  description = "security group for the application load balancer"
-  vpc_id  = var.vpc_id
+  name_prefix = "${var.environment}-backend-nlb-"
+  description = "Security group for the internal backend Network Load Balancer"
+  vpc_id      = var.vpc_id
 
   tags = {
+    Name        = "${var.environment}-backend-nlb-sg"
     environment = var.environment
-    terraform = true
+    terraform   = "true"
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "ingress_tcp_ipv4-us-east-1a" {
+resource "aws_vpc_security_group_ingress_rule" "nlb_ingress_from_public_subnets" {
+  for_each = toset(var.public_subnet_cidrs)
+
   security_group_id = aws_security_group.sg_nlb.id
-  cidr_ipv4         = var.public_subnets[0]
-  from_port         = 80
+  cidr_ipv4         = each.value
+  from_port         = var.backend_app_port
   ip_protocol       = "tcp"
-  to_port           = 80
+  to_port           = var.backend_app_port
 }
 
-resource "aws_vpc_security_group_ingress_rule" "ingress_tcp_ipv4-us-east-1b" {
+resource "aws_vpc_security_group_egress_rule" "nlb_egress_to_private_subnets" {
+  for_each = toset(var.private_subnet_cidrs)
+
   security_group_id = aws_security_group.sg_nlb.id
-  cidr_ipv4         = var.public_subnets[1]
-  from_port         = 80
+  cidr_ipv4         = each.value
+  from_port         = var.backend_app_port
   ip_protocol       = "tcp"
-  to_port           = 80
+  to_port           = var.backend_app_port
 }
 
-resource "aws_vpc_security_group_egress_rule" "egress_traffic_ipv4-us-east-1a" {
-  security_group_id = aws_security_group.sg_nlb.id
-  cidr_ipv4         = var.private_subnets[0]
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
-}
-
-resource "aws_vpc_security_group_egress_rule" "egress_traffic_ipv4-us-east-1b" {
-  security_group_id = aws_security_group.sg_nlb.id
-  cidr_ipv4         = var.private_subnets[1]
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
-}
-
+# --- Internal Network Load Balancer ---
 resource "aws_lb" "nlb" {
-  internal           = false
+  name_prefix        = "be-"
+  internal           = true
   load_balancer_type = "network"
   security_groups    = [aws_security_group.sg_nlb.id]
   subnets            = var.vpc_private_subnets
 
   tags = {
+    Name        = "${var.environment}-backend-nlb"
     environment = var.environment
-    terraform = true
+    terraform   = "true"
   }
 }
 
-# Crear Target Group
 resource "aws_lb_target_group" "target" {
-  port        = 80
+  name_prefix = "be-"
+  port        = var.backend_app_port
   protocol    = "TCP"
   vpc_id      = var.vpc_id
+
   health_check {
-    path                = "/"
+    protocol            = "TCP"
     interval            = 30
-    timeout             = 5
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
+
+  tags = {
+    Name        = "${var.environment}-backend-tg"
+    environment = var.environment
+  }
 }
 
-# Listener para el ALB
-resource "aws_lb_listener" "http" {
+resource "aws_lb_listener" "tcp" {
   load_balancer_arn = aws_lb.nlb.arn
-  port              = 80
+  port              = var.backend_app_port
   protocol          = "TCP"
 
   default_action {
@@ -140,31 +138,37 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# --- ec2 security_groups ---
+# --- Backend EC2 Security Group ---
 resource "aws_security_group" "sg_ec2" {
-  description = "security group for the ec2 template"
-  vpc_id  = var.vpc_id
+  name_prefix = "${var.environment}-backend-ec2-"
+  description = "Security group for backend EC2 instances"
+  vpc_id      = var.vpc_id
 
   tags = {
+    Name        = "${var.environment}-backend-ec2-sg"
     environment = var.environment
-    terraform = true
+    terraform   = "true"
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_http_ipv4" {
+# NLB preserves client IP for instance targets; allow backend port from frontend (public) & NLB health checks (private) subnets
+resource "aws_vpc_security_group_ingress_rule" "allow_app_port_from_vpc_subnets" {
+  for_each = toset(concat(var.public_subnet_cidrs, var.private_subnet_cidrs))
+
   security_group_id = aws_security_group.sg_ec2.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 80
+  cidr_ipv4         = each.value
+  from_port         = var.backend_app_port
   ip_protocol       = "tcp"
-  to_port           = 80
+  to_port           = var.backend_app_port
 }
 
-resource "aws_vpc_security_group_ingress_rule" "allow_ssh_ipv4" {
-  security_group_id = aws_security_group.sg_ec2.id
-  cidr_ipv4         = var.public_subnets[1]
-  from_port         = 22
-  ip_protocol       = "tcp"
-  to_port           = 22
+# Allow SSH strictly from the Ansible Control Node security group
+resource "aws_vpc_security_group_ingress_rule" "allow_ssh_from_control_node" {
+  security_group_id            = aws_security_group.sg_ec2.id
+  referenced_security_group_id = var.control_node_sg_id
+  from_port                    = 22
+  ip_protocol                  = "tcp"
+  to_port                      = 22
 }
 
 resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
@@ -173,34 +177,56 @@ resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
   ip_protocol       = "-1"
 }
 
-# --- ec2 template ---
+# --- Launch Template ---
 resource "aws_launch_template" "ec2_template" {
-  image_id = var.backend_ami
+  name_prefix   = "${var.environment}-backend-lt-"
+  image_id      = var.backend_ami
   instance_type = var.backend_instance_type
-
-  key_name = var.key_pair_name
+  key_name      = var.key_pair_name
 
   network_interfaces {
     security_groups = [aws_security_group.sg_ec2.id]
   }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name        = "${var.environment}-backend"
+      Role        = "backend"
+      environment = var.environment
+    }
+  }
 }
 
-# --- autoscaling group ---
+# --- Auto Scaling Group ---
 resource "aws_autoscaling_group" "autoscaling" {
-  max_size                  = var.backend_autoscaling_max_size
-  min_size                  = var.backend_autoscaling_min_size
-  desired_capacity          = var.backend_autoscaling_desired_capacity
-
+  name_prefix         = "${var.environment}-backend-asg-"
+  max_size            = var.backend_autoscaling_max_size
+  min_size            = var.backend_autoscaling_min_size
+  desired_capacity    = var.backend_autoscaling_desired_capacity
   vpc_zone_identifier = var.vpc_private_subnets
 
   health_check_grace_period = 300
   health_check_type         = "ELB"
 
   launch_template {
-    id = aws_launch_template.ec2_template.id
+    id      = aws_launch_template.ec2_template.id
+    version = "$Latest"
   }
 
   target_group_arns = [aws_lb_target_group.target.arn]
+
+  tag {
+    key                 = "Name"
+    value               = "${var.environment}-backend"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Role"
+    value               = "backend"
+    propagate_at_launch = true
+  }
 
   tag {
     key                 = "environment"
@@ -209,9 +235,9 @@ resource "aws_autoscaling_group" "autoscaling" {
   }
 }
 
-resource "aws_autoscaling_policy" "cpu_policy_up" {
-  name                   = "cpu-policy-up"
-  adjustment_type        = "ChangeInCapacity"
+# Single TargetTrackingScaling policy handles both scale-out and scale-in automatically
+resource "aws_autoscaling_policy" "cpu_target_tracking" {
+  name                   = "${var.environment}-backend-cpu-target-tracking"
   policy_type            = "TargetTrackingScaling"
   autoscaling_group_name = aws_autoscaling_group.autoscaling.name
 
@@ -219,20 +245,6 @@ resource "aws_autoscaling_policy" "cpu_policy_up" {
     predefined_metric_specification {
       predefined_metric_type = "ASGAverageCPUUtilization"
     }
-    target_value = 80.0
-  }
-}
-
-resource "aws_autoscaling_policy" "cpu_policy_down" {
-  name                   = "cpu-policy-up"
-  adjustment_type        = "ChangeInCapacity"
-  policy_type            = "TargetTrackingScaling"
-  autoscaling_group_name = aws_autoscaling_group.autoscaling.name
-
-  target_tracking_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ASGAverageCPUUtilization"
-    }
-    target_value = 30.0
+    target_value = 70.0
   }
 }

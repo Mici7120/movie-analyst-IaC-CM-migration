@@ -1,0 +1,3 @@
+# Exclude unencrypted Ansible group_vars containing database passwords
+group_vars/all.yml
+*.retry

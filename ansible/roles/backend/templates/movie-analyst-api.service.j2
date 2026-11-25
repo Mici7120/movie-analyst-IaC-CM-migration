@@ -1,0 +1,21 @@
+[Unit]
+Description=Movie Analyst Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=movieapp
+WorkingDirectory={{ backend_app_dir }}
+Environment=NODE_ENV=production
+Environment=PORT={{ backend_port | default(3000) }}
+Environment=DB_HOST={{ db_host }}
+Environment=DB_PORT={{ db_port | default(3306) }}
+Environment=DB_NAME={{ db_name }}
+Environment=DB_USER={{ db_user }}
+Environment=DB_PASS={{ db_password }}
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+---
+# Copy this file to ansible/group_vars/all.yml (or encrypt with ansible-vault)
+# and fill in the values from `terraform output`.
+
+app_env: qa
+node_major_version: "20"
+
+# Application repositories (override if using your own fork)
+backend_repo_url: "https://github.com/auth0-blog/movie-analyst-api.git"
+backend_repo_version: "master"
+backend_app_dir: "/opt/movie-analyst-api"
+backend_port: 3000
+
+frontend_repo_url: "https://github.com/auth0-blog/movie-analyst-ui.git"
+frontend_repo_version: "master"
+frontend_app_dir: "/opt/movie-analyst-ui"
+frontend_port: 3030
+
+# RDS MySQL connection (from `terraform output rds_address` and `rds_db_name`)
+db_host: "REPLACE_WITH_RDS_ADDRESS"
+db_port: 3306
+db_name: "movie_db"
+db_user: "admin"
+db_password: "REPLACE_WITH_DB_PASSWORD"
+
+# Internal NLB DNS name (from `terraform output nlb_dns_name`)
+backend_nlb_host: "REPLACE_WITH_NLB_DNS_NAME"

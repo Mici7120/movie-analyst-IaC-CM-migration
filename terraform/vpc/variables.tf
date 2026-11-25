@@ -1,31 +1,31 @@
 variable "environment" {
-  description = "environment type"
-  type = string
-  default = "qa"
+  description = "Environment name"
+  type        = string
+  default     = "qa"
 }
 
 variable "vpc_name" {
   description = "VPC name"
-  type = string
-  default = "vpc-terraform"
+  type        = string
+  default     = "movie-analyst-vpc"
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block"
-  type = string
+  description = "VPC CIDR block"
+  type        = string
 }
 
 variable "vpc_azs" {
-  description = "list of availability zones"
-  type = list
+  description = "List of availability zones"
+  type        = list(string)
 }
 
 variable "vpc_public_subnets" {
-  description = "list of public_subnets"
-  type = list
+  description = "List of public subnet CIDR blocks"
+  type        = list(string)
 }
 
 variable "vpc_private_subnets" {
-  description = "list of private_subnets"
-  type = list
+  description = "List of private subnet CIDR blocks"
+  type        = list(string)
 }

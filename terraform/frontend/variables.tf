@@ -1,56 +1,50 @@
 variable "vpc_id" {
-  description = "vpc id"
-  type = string
+  description = "VPC ID"
+  type        = string
 }
 
 variable "vpc_public_subnets" {
-  description = "list of public subnets id"
-  type = list
+  description = "List of public subnet IDs"
+  type        = list(string)
 }
 
 variable "environment" {
-  description = "environment type"
-  type = string
-  default = "qa"
+  description = "Environment name"
+  type        = string
+  default     = "qa"
 }
 
 variable "frontend_ami" {
-  description = "image of the frontend ec2 instance"
-  type = string
+  description = "AMI ID for frontend EC2 instances"
+  type        = string
 }
 
 variable "frontend_instance_type" {
-  description = "type of the ec2 instance"
-  type = string
+  description = "EC2 instance type for frontend instances"
+  type        = string
 }
 
 variable "frontend_autoscaling_max_size" {
-  description = "max size of the autoscaling group"
-  type = number
+  description = "Maximum size of the frontend Auto Scaling Group"
+  type        = number
 }
 
 variable "frontend_autoscaling_min_size" {
-  description = "min size of the autoscaling group"
-  type = number
+  description = "Minimum size of the frontend Auto Scaling Group"
+  type        = number
 }
 
 variable "frontend_autoscaling_desired_capacity" {
-  description = "desired capacity of the autoscaling group"
-  type = number
-}
-
-variable "frontend_cidr_ip4_backend_target" {
-  description = "the cidr ipv4 address to connect to the backend"
-  type = string
+  description = "Desired capacity of the frontend Auto Scaling Group"
+  type        = number
 }
 
 variable "key_pair_name" {
-  description = "key pair name"
-  type = string
-  sensitive = true
+  description = "EC2 SSH key pair name"
+  type        = string
 }
 
-variable "public_subnets" {
-  description = "list of public subnets of the frontend"
-  type = list
+variable "control_node_sg_id" {
+  description = "Security group ID of the Ansible Control Node for SSH access"
+  type        = string
 }

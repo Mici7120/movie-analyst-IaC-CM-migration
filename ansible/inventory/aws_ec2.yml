@@ -1,0 +1,23 @@
+---
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - us-east-1
+
+filters:
+  instance-state-name: running
+  tag:Role:
+    - frontend
+    - backend
+
+keyed_groups:
+  - key: tags.Role
+    prefix: role
+    separator: "_"
+  - key: tags.environment
+    prefix: env
+    separator: "_"
+
+compose:
+  # Connect over private IP from the Ansible Control Node inside the VPC
+  ansible_host: private_ip_address

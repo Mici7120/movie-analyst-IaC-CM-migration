@@ -1,0 +1,16 @@
+---
+- name: Configure and deploy Movie Analyst Backend tier
+  hosts: role_backend
+  become: true
+  gather_facts: true
+  roles:
+    - common
+    - backend
+
+- name: Configure and deploy Movie Analyst Frontend tier
+  hosts: role_frontend
+  become: true
+  gather_facts: true
+  roles:
+    - common
+    - frontend

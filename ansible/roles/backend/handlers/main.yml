@@ -1,0 +1,6 @@
+---
+- name: Restart movie-analyst-api
+  ansible.builtin.systemd:
+    name: movie-analyst-api
+    state: restarted
+    daemon_reload: true
